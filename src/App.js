@@ -14,54 +14,14 @@ function App() {
 // Add Spotify authentication flow
 const authenticateSpotify = async () => {
   try {
-    const response = await axios.get('/spotify-login');
-    if (response.data.auth_url) {
-      window.location.href = response.data.auth_url;
-    }
+    // Point to Flask backend endpoint
+    const response = await axios.get('http://localhost:5000/spotify-login');
+    window.location.href = response.data.auth_url;
   } catch (error) {
     console.error('Spotify auth error:', error);
   }
 };
 
-// const handleEmotionDetected = async (data) => {
-//   // Add null checks for data and its properties
-//   if (!data || !data.emotions || !Array.isArray(data.emotions)) {
-//     console.error('Invalid emotion data structure:', data);
-//     setEmotion(null);
-//     setRecommendations([]);
-//     return;
-//   }
-
-//   // Safely access first emotion with optional chaining
-//   const primaryEmotion = data.emotions?.[0]?.name || 'neutral';
-//   setEmotion(primaryEmotion);
-
-  
-//   // Handle recommendations safely
-//   setRecommendations(data.recommendations || []);
-
-//   // Handle Spotify authentication flow
-//   try {
-//     const spotifyStatus = await axios.get('/spotify-login');
-    
-//     if (!spotifyStatus?.data) {
-//       throw new Error('Invalid Spotify status response');
-//     }
-
-//     if (spotifyStatus.data.status !== 'already_authenticated') {
-//       await authenticateSpotify();
-//     } else {
-//       // Only fetch playlists when already authenticated
-//       const emotionIndex = emotion_map.indexOf(primaryEmotion);
-//       if (emotionIndex !== -1) {
-//         const playlists = await axios.get(`/get_playlists?emotion=${emotionIndex}`);
-//         window.open(playlists.data.playlist_url, '_blank');
-//       }
-//     }
-//   } catch (error) {
-//     console.error('Spotify check error:', error);
-//   }
-// };
 
 const handleEmotionDetected = async (data) => {
   if (!data?.emotions?.length) {
@@ -76,20 +36,29 @@ const handleEmotionDetected = async (data) => {
   setRecommendations(data.recommendations);
 
   try {
-    const spotifyStatus = await axios.get('/spotify-login');
+    const authCheck = await axios.get('http://localhost:5000/spotify-login');
 
-    if (spotifyStatus.data.auth_url) {
-      window.location.href = spotifyStatus.data.auth_url;
-      return; // Important: Stop execution after redirect
+    if (authCheck.data.auth_url) {
+      window.location.href = authCheck.data.auth_url;
+      return;
     }
 
-    const playlists = await axios.get(`/get_playlists?emotion=${primaryEmotionIndex}`);
-    window.open(playlists.data.playlist_url, '_blank'); // Open playlist
+    // Get the Spotify URI (e.g., "spotify:playlist:...")
+    const spotifyUri = data.recommendations[0];
+
+    // Open Spotify app using the URI
+    window.location.href = spotifyUri;  // Direct deep link
+
+    // Fallback to web player if app isn't installed
+    setTimeout(() => {
+      const playlistId = spotifyUri.split(':')[2];
+      window.open(`https://open.spotify.com/playlist/${playlistId}`, '_blank');
+    }, 500);
+
   } catch (error) {
     console.error('Spotify error:', error);
   }
 };
-
 
   return (
     <div>

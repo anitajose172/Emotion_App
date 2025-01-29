@@ -4,10 +4,40 @@ import axios from "axios";
 
 const Camera = ({ onEmotionDetected }) => {
   const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+
+
   const [isCapturing, setIsCapturing] = useState(false);
   const [captureError, setCaptureError] = useState(null);
   const [emotions, setEmotions] = useState([]);
   const [isContinuous, setIsContinuous] = useState(false);
+
+  const drawBoundingBoxes = (faces) => {
+    const canvas = canvasRef.current;
+    const video = videoRef.current.video;
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Match canvas size to video feed
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    faces.forEach((face, index) => {
+      const { x, y, w, h } = face;
+      ctx.strokeStyle = "#FF0000";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+
+      // Draw emotion label
+      ctx.fillStyle = "#FF0000";
+      ctx.font = "16px Arial";
+      ctx.fillText(emotions[index], x + 5, y - 5);
+    });
+  };
+
+
 
   const handleCapture = async () => {
     setIsCapturing(true);
@@ -31,9 +61,10 @@ const Camera = ({ onEmotionDetected }) => {
       });
 
       if (response.data && response.data.emotions) {
-        const { emotions } = response.data; // Assuming backend sends an "emotions" array
+        const { emotions, face_coordinates } = response.data; // Assuming backend sends an "emotions" array
         setEmotions(emotions);
-        onEmotionDetected(emotions); // Pass detected emotions to parent component if needed
+        drawBoundingBoxes(face_coordinates); // Draw boxes after response
+        onEmotionDetected(response.data);
       } else {
         setCaptureError("No emotions detected.");
       }
@@ -57,13 +88,20 @@ const Camera = ({ onEmotionDetected }) => {
 
   return (
     <div className="camera-container">
-      <Webcam
-        audio={false}
-        height={480}
-        ref={videoRef}
-        screenshotFormat="image/jpeg"
-        className="webcam-view"
+      <div style={{ position: 'relative' }}>
+        <Webcam
+          audio={false}
+          height={480}
+          ref={videoRef}
+          screenshotFormat="image/jpeg"
+          className="webcam-view"
+        />
+        <canvas
+          ref={canvasRef}
+          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
       />
+      
+      </div>
       <div className="controls">
         <button disabled={isCapturing} onClick={handleCapture}>
           {isCapturing ? "Detecting Emotion..." : "Capture Emotion"}
