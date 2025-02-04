@@ -12,7 +12,7 @@ from spotipy.cache_handler import FlaskSessionCacheHandler
 import os
 
 app = Flask(__name__)
-# In app.py
+
 CORS(app, resources={r"/*": {
     "origins": "http://localhost:3000",
     "methods": ["GET", "POST"],
@@ -28,11 +28,11 @@ if face_classifier.empty():
     logging.error("Failed to load Haar Cascade classifier.")
 
 # Load the model
-model = load_model("model.h5")  # Ensure this path is correct
+model = load_model("model.h5") 
 logging.info("Model loaded successfully.")
 
 # Emotion mapping
-# Correct emotion_map to match frontend's labels and order
+
 emotion_map = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
 emotion_dict = {
     0: "angry", 
@@ -63,7 +63,7 @@ sp=Spotify(oauth_manager=sp_oauth)
 # Emotion and Playlist mapping
 emotion_dict = {0: "Angry", 1: "Disgusted", 2: "Fearful", 3: "Happy", 4: "Neutral", 5: "Sad", 6: "Surprised"}
 
-# Replace existing music_dist with URI scheme
+
 music_dist = {
     0: "spotify:playlist:37i9dQZF1DX1uHCeQukD5j",  # Angry
     1: "spotify:playlist:37i9dQZF1DX3YSRoSdA634",  # Disgusted
@@ -74,7 +74,7 @@ music_dist = {
     6: "spotify:playlist:37i9dQZF1DX8FwnYE6PRvL"   # Surprised
 }
 
-# In the /detect_emotion endpoint, update recommendations:
+
 
 
 @app.route('/detect_emotion', methods=['POST'])
@@ -138,33 +138,40 @@ def detect_emotion():
     
 @app.route('/spotify-login')
 def spotify_login():
-        # Return auth URL if not authenticated
-        auth_url = sp_oauth.get_authorize_url() 
-        return jsonify({'auth_url': auth_url})
+    emotion_id = request.args.get('emotion', type=int)
+    if emotion_id not in music_dist:
+        return jsonify({"error": "Invalid emotion ID"}), 400
+        
+    auth_url = sp_oauth.get_authorize_url(state=str(emotion_id))
+    return jsonify({'auth_url': auth_url})
     
 
 @app.route('/callback')
 def callback():
+    emotion_id = request.args.get('state')  # Get emotion ID from state
     sp_oauth.get_access_token(request.args["code"])
-    return redirect(url_for('get_playlists'))
-
+    return redirect(url_for('get_playlists', emotion=emotion_id))
 
 @app.route("/get_playlists")
 def get_playlists():
     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
         auth_url = sp_oauth.get_authorize_url()
         return redirect(auth_url)
-    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
-        return jsonify({"error": "Authentication required"}), 401
 
-    emotion_id = request.args.get("emotion", type=int)
+    try:
+        emotion_id = int(request.args.get("emotion"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Missing or invalid emotion parameter"}), 400
+
     if emotion_id not in music_dist:
-        return jsonify({"error": "Invalid emotion"}), 400
+        return jsonify({"error": "Invalid emotion ID"}), 400
 
-    playlist_id = music_dist[emotion_id]
-    playlist_url = f"https://open.spotify.com/playlist/{playlist_id}"
-    
-    return jsonify({"playlist_url": playlist_url})
+    playlist_uri = music_dist[emotion_id]
+    playlist_id = playlist_uri.split(':')[-1]
+    return jsonify({
+        "playlist_url": f"https://open.spotify.com/playlist/{playlist_id}",
+        "playlist_uri": playlist_uri
+    })
 
 @app.route("/")
 def home():
@@ -181,4 +188,4 @@ def logout():
     return redirect(url_for("home"))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000) 
+    app.run(debug=True, port=8080) 

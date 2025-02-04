@@ -56,12 +56,12 @@ const Camera = ({ onEmotionDetected }) => {
       const base64Image = imageSrc.split(",")[1];
 
       // Send the Base64 image to the Flask backend
-      const response = await axios.post("http://127.0.0.1:5000/detect_emotion", {
+      const response = await axios.post("http://127.0.0.1:8080/detect_emotion", {
         image: base64Image,
       });
 
       if (response.data && response.data.emotions) {
-        const { emotions, face_coordinates } = response.data; // Assuming backend sends an "emotions" array
+        const { emotions, face_coordinates } = response.data;
         setEmotions(emotions);
         drawBoundingBoxes(face_coordinates); // Draw boxes after response
         onEmotionDetected(response.data);
@@ -81,7 +81,7 @@ const Camera = ({ onEmotionDetected }) => {
     if (isContinuous && !isCapturing) {
       interval = setInterval(() => {
         handleCapture();
-      }, 3000); // Capture every 3 seconds
+      }, 3000);
     }
     return () => clearInterval(interval);
   }, [isContinuous, isCapturing]);
