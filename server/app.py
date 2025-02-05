@@ -136,6 +136,7 @@ def detect_emotion():
         logging.error(f"Error in detect_emotion: {str(e)}")
         return jsonify({'error': str(e)}), 500
     
+    
 @app.route('/spotify-login')
 def spotify_login():
     emotion_id = request.args.get('emotion', type=int)
@@ -145,6 +146,74 @@ def spotify_login():
     auth_url = sp_oauth.get_authorize_url(state=str(emotion_id))
     return jsonify({'auth_url': auth_url})
     
+@app.route("/callback")
+def callback():
+    try:
+        # Exchange code for an access token
+        sp_oauth.get_access_token(request.args["code"])
+        
+        # Get emotion ID from the 'state' parameter passed during Spotify login
+        emotion_id = request.args.get("state", type=int)
+        if emotion_id not in music_dist:
+            return "Invalid emotion ID", 400
+
+        # Redirect to the Spotify playlist URL
+        playlist_uri = music_dist[emotion_id]
+        playlist_id = playlist_uri.split(':')[-1]
+        playlist_url = f"https://open.spotify.com/playlist/{playlist_id}"
+        return redirect(playlist_url)
+
+    except Exception as e:
+        logging.error(f"Error in callback: {str(e)}")
+        return "Authorization failed. Please try again.", 500
+
+
+@app.route("/get_playlists")
+def get_playlists():
+    try:
+        # Validate the Spotify token
+        if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+            auth_url = sp_oauth.get_authorize_url()
+            return redirect(auth_url)
+
+        # Get emotion ID from query parameters
+        emotion_id = int(request.args.get("emotion"))
+        if emotion_id not in music_dist:
+            return "Invalid emotion ID", 400
+
+        # Generate the Spotify playlist URL
+        playlist_uri = music_dist[emotion_id]
+        playlist_id = playlist_uri.split(':')[-1]
+        playlist_url = f"https://open.spotify.com/playlist/{playlist_id}"
+
+        # Redirect to the playlist URL
+        return redirect(playlist_url)
+
+    except Exception as e:
+        logging.error(f"Error in get_playlists: {str(e)}")
+        return "Failed to fetch playlist. Please try again.", 500
+
+
+# @app.route("/get_playlists")
+# def get_playlists():
+#     if not sp_oauth.validate_token(cache_handler.get_cached_token()):
+#         auth_url = sp_oauth.get_authorize_url()
+#         return redirect(auth_url)
+
+#     try:
+#         emotion_id = int(request.args.get("emotion"))
+#     except (TypeError, ValueError):
+#         return jsonify({"error": "Missing or invalid emotion parameter"}), 400
+
+#     if emotion_id not in music_dist:
+#         return jsonify({"error": "Invalid emotion ID"}), 400
+
+#     playlist_uri = music_dist[emotion_id]
+#     playlist_id = playlist_uri.split(':')[-1]
+#     return jsonify({
+#         "playlist_url": f"https://open.spotify.com/playlist/{playlist_id}",
+#         "playlist_uri": playlist_uri
+#     })
 
 # @app.route('/callback')
 # def callback():
@@ -152,38 +221,7 @@ def spotify_login():
 #     sp_oauth.get_access_token(request.args["code"])
 #     return redirect(url_for('get_playlists', emotion=emotion_id))
 
-@app.route("/get_playlists")
-def get_playlists():
-    if not sp_oauth.validate_token(cache_handler.get_cached_token()):
-        auth_url = sp_oauth.get_authorize_url()
-        return redirect(auth_url)
 
-    try:
-        emotion_id = int(request.args.get("emotion"))
-    except (TypeError, ValueError):
-        return jsonify({"error": "Missing or invalid emotion parameter"}), 400
-
-    if emotion_id not in music_dist:
-        return jsonify({"error": "Invalid emotion ID"}), 400
-
-    playlist_uri = music_dist[emotion_id]
-    playlist_id = playlist_uri.split(':')[-1]
-    return jsonify({
-        "playlist_url": f"https://open.spotify.com/playlist/{playlist_id}",
-        "playlist_uri": playlist_uri
-    })
-
-@app.route('/callback')
-def callback():
-    emotion_id = request.args.get('state')  # Get emotion ID from state
-    sp_oauth.get_access_token(request.args["code"])
-    playlist_uri = music_dist.get(int(emotion_id))
-    if not playlist_uri:
-        return jsonify({"error": "Invalid emotion ID"}), 400
-    playlist_id = playlist_uri.split(':')[-1]
-    playlist_url = f"https://open.spotify.com/playlist/{playlist_id}"
-    frontend_url = f"http://localhost:3000/?playlist_url={playlist_url}"
-    return redirect(frontend_url)
 
 @app.route("/")
 def home():
@@ -200,4 +238,4 @@ def logout():
     return redirect(url_for("home"))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=8080) 
+    app.run(debug=True, port=8080)
