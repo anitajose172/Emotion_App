@@ -146,11 +146,11 @@ def spotify_login():
     return jsonify({'auth_url': auth_url})
     
 
-@app.route('/callback')
-def callback():
-    emotion_id = request.args.get('state')  # Get emotion ID from state
-    sp_oauth.get_access_token(request.args["code"])
-    return redirect(url_for('get_playlists', emotion=emotion_id))
+# @app.route('/callback')
+# def callback():
+#     emotion_id = request.args.get('state')  # Get emotion ID from state
+#     sp_oauth.get_access_token(request.args["code"])
+#     return redirect(url_for('get_playlists', emotion=emotion_id))
 
 @app.route("/get_playlists")
 def get_playlists():
@@ -172,6 +172,18 @@ def get_playlists():
         "playlist_url": f"https://open.spotify.com/playlist/{playlist_id}",
         "playlist_uri": playlist_uri
     })
+
+@app.route('/callback')
+def callback():
+    emotion_id = request.args.get('state')  # Get emotion ID from state
+    sp_oauth.get_access_token(request.args["code"])
+    playlist_uri = music_dist.get(int(emotion_id))
+    if not playlist_uri:
+        return jsonify({"error": "Invalid emotion ID"}), 400
+    playlist_id = playlist_uri.split(':')[-1]
+    playlist_url = f"https://open.spotify.com/playlist/{playlist_id}"
+    frontend_url = f"http://localhost:3000/?playlist_url={playlist_url}"
+    return redirect(frontend_url)
 
 @app.route("/")
 def home():

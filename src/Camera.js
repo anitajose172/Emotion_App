@@ -6,21 +6,20 @@ const Camera = ({ onEmotionDetected }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [captureError, setCaptureError] = useState(null);
   const [emotions, setEmotions] = useState([]);
-  const [isContinuous, setIsContinuous] = useState(false);
+  const [setFaceCoordinates] = useState([]);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [isDetected, setIsDetected] = useState(false);
 
-  const drawBoundingBoxes = (faces) => {
+  // Function to draw bounding boxes
+  const drawBoundingBoxes = (faces, emotions) => {
     const canvas = canvasRef.current;
-    const video = videoRef.current.video;
+    const video = videoRef.current?.video;
     if (!canvas || !video) return;
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Match canvas size to video feed
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
 
@@ -33,62 +32,79 @@ const Camera = ({ onEmotionDetected }) => {
       // Draw emotion label
       ctx.fillStyle = "#FF0000";
       ctx.font = "16px Arial";
-      ctx.fillText(emotions[index], x + 5, y - 5);
+      ctx.fillText(emotions[index] || "Unknown", x + 5, y - 5);
     });
   };
 
+  // Function to detect emotions in real time
+  const detectEmotionLive = async () => {
+    if (!videoRef.current) return;
 
-
-  const handleCapture = async () => {
-    setIsCapturing(true);
-    setCaptureError(null);
+    const imageSrc = videoRef.current.getScreenshot();
+    if (!imageSrc) return;
 
     try {
-      const imageSrc = videoRef.current.getScreenshot();
-
-      if (!imageSrc) {
-        setCaptureError("Unable to capture image.");
-        setIsCapturing(false);
-        return;
-      }
-
-      // Extract only the Base64 part of the image string
       const base64Image = imageSrc.split(",")[1];
 
-      // Send the Base64 image to the Flask backend
       const response = await axios.post("http://127.0.0.1:8080/detect_emotion", {
         image: base64Image,
       });
 
       if (response.data && response.data.emotions) {
-        const { emotions, face_coordinates } = response.data;
-        setEmotions(emotions);
-        drawBoundingBoxes(face_coordinates); // Draw boxes after response
-        onEmotionDetected(response.data);
-      } else {
-        setCaptureError("No emotions detected.");
+        setEmotions(response.data.emotions);
+        setFaceCoordinates(response.data.face_coordinates);
+        drawBoundingBoxes(response.data.face_coordinates, response.data.emotions);
       }
     } catch (error) {
-      setCaptureError("Error capturing image or processing with API.");
-      console.error("Camera capture error:", error);
+      console.error("Error detecting emotion:", error);
+    }
+  };
+
+  // Function to capture emotion and redirect to Spotify after 30s
+  const handleCapture = async () => {
+    setIsCapturing(true);
+    setIsDetected(false);
+
+    const imageSrc = videoRef.current.getScreenshot();
+    if (!imageSrc) {
+      setIsCapturing(false);
+      return;
+    }
+
+    try {
+      const base64Image = imageSrc.split(",")[1];
+
+      const response = await axios.post("http://127.0.0.1:8080/detect_emotion", {
+        image: base64Image,
+      });
+
+      if (response.data && response.data.emotions) {
+        setEmotions(response.data.emotions);
+        setFaceCoordinates(response.data.face_coordinates);
+        drawBoundingBoxes(response.data.face_coordinates, response.data.emotions);
+        setIsDetected(true);
+
+        // Wait 30 seconds before redirecting to Spotify
+        setTimeout(() => {
+          window.location.href = "https://open.spotify.com/";
+        }, 5000);
+      }
+    } catch (error) {
+      console.error("Error detecting emotion:", error);
     } finally {
       setIsCapturing(false);
     }
   };
 
+  // Run real-time emotion detection every 3 seconds
   useEffect(() => {
-    let interval;
-    if (isContinuous && !isCapturing) {
-      interval = setInterval(() => {
-        handleCapture();
-      }, 3000);
-    }
+    const interval = setInterval(detectEmotionLive, 3000);
     return () => clearInterval(interval);
-  }, [isContinuous, isCapturing]);
+  }, []);
 
   return (
     <div className="camera-container">
-      <div style={{ position: 'relative' }}>
+      <div style={{ position: "relative" }}>
         <Webcam
           audio={false}
           height={480}
@@ -98,24 +114,22 @@ const Camera = ({ onEmotionDetected }) => {
         />
         <canvas
           ref={canvasRef}
-          style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}
-      />
-      
+          style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
+        />
       </div>
       <div className="controls">
         <button disabled={isCapturing} onClick={handleCapture}>
-          {isCapturing ? "Detecting Emotion..." : "Capture Emotion"}
-        </button>
-        <button onClick={() => setIsContinuous(!isContinuous)}>
-          {isContinuous ? "Stop Continuous Detection" : "Start Continuous Detection"}
+          {isCapturing ? "Capturing..." : "Capture Emotion"}
         </button>
       </div>
-      {captureError && <p className="error-message">{captureError}</p>}
+      {isDetected && <p>Emotion detected! Redirecting in 5 seconds...</p>}
       <div className="emotions-list">
         {emotions.length > 0 && <h3>Detected Emotions:</h3>}
         <ul>
           {emotions.map((emotion, index) => (
-            <li key={index}>Emotion {index + 1}: {emotion}</li>
+            <li key={index}>
+              Emotion {index + 1}: {emotion}
+            </li>
           ))}
         </ul>
       </div>
