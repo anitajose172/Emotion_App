@@ -5,40 +5,63 @@ import EmotionDisplay from './EmotionDisplay';
 import axios from "axios";
 
 function App() {
-  const [emotion] = useState(null);
+  const [emotion, setEmotion] = useState(null);
 
-
-const authenticateSpotify = async (emotionId) => {
-  try {
-    const response = await axios.get('http://localhost:8080/spotify-login', {
-      params: { emotion: emotionId }
-    });
-    
-    if (response.data.auth_url) {
-      window.location.href = response.data.auth_url;
+  const authenticateSpotify = async (emotionId) => {
+    try {
+      const response = await axios.get('http://localhost:8080/spotify-login', {
+        params: { emotion: emotionId },
+      });
+      
+      if (response.data.auth_url) {
+        window.location.href = response.data.auth_url; // Redirect to Spotify auth
+      }
+    } catch (error) {
+      console.error('Spotify auth error:', error);
     }
-  } catch (error) {
-    console.error('Spotify auth error:', error);
-  }
-};
+  };
 
-const handleEmotionDetected = async (data) => {
-  if (!data?.emotions?.length) return;
+  const handleEmotionDetected = async (data) => {
+    if (!data?.emotions?.length) return;
 
-  const emotionId = data.emotion_indices[0];
-  authenticateSpotify(emotionId);
-};
+    const primaryEmotionIndex = data.emotion_indices[0];
 
+    // Save the detected emotion for display
+    setEmotion(data.emotions[0]);
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  const playlistUrl = params.get('playlist_url');
-  if (playlistUrl) {
-    window.open(playlistUrl, '_blank');
-    // Clean the URL
-    window.history.replaceState({}, '', window.location.pathname);
-  }
-}, []);
+    try {
+      // Redirect to Spotify for authorization
+      authenticateSpotify(primaryEmotionIndex);
+    } catch (error) {
+      console.error('Error during Spotify flow:', error);
+    }
+  };
+
+  useEffect(() => {
+    const handleSpotifyCallback = async () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code');
+      const emotionId = params.get('state');
+
+      if (code && emotionId) {
+        try {
+          // Fetch playlist URL after authorization
+          const response = await axios.get('http://localhost:8080/get_playlists', {
+            params: { emotion: emotionId },
+          });
+
+          if (response.data.playlist_url) {
+            // Open the playlist in a new tab
+            window.open(response.data.playlist_url, '_blank');
+          }
+        } catch (error) {
+          console.error('Error fetching playlist:', error);
+        }
+      }
+    };
+
+    handleSpotifyCallback();
+  }, []);
 
   return (
     <div>
@@ -47,7 +70,5 @@ useEffect(() => {
     </div>
   );
 }
-
-
 
 export default App;
