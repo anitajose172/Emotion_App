@@ -43,8 +43,8 @@ emotion_dict = {
     5: "sad", 
     6: "surprise"
 }
-client_id='6cd718ff18974b80a2d40c6b25cd687a'
-client_secret='6d543f9e231d47578127e656f22f25b4'
+client_id=''
+client_secret=''
 redirect_uri='http://localhost:8080/callback'
 scope='playlist-read-private,streaming,user-read-private,playlist-read-collaborative,playlist-modify-private'
 
