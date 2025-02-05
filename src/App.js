@@ -65,9 +65,12 @@ function App() {
 
   return (
     <div>
+      <h1 className="title">Music Recommendation System via Emotion Detection</h1>
+
       <Camera onEmotionDetected={handleEmotionDetected} />
       <EmotionDisplay emotion={emotion} />
     </div>
+
   );
 }
 

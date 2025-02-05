@@ -6,7 +6,6 @@ const Camera = ({ onEmotionDetected }) => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
-  const [isCapturing, setIsCapturing] = useState(false);
   const [captureError, setCaptureError] = useState(null);
   const [emotions, setEmotions] = useState([]);
   const [isWebcamReady, setIsWebcamReady] = useState(false);
