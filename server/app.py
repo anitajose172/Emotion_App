@@ -43,8 +43,8 @@ emotion_dict = {
     5: "sad", 
     6: "surprise"
 }
-client_id=''
-client_secret=''
+client_id='6cd718ff18974b80a2d40c6b25cd687a'
+client_secret='6d543f9e231d47578127e656f22f25b4'
 redirect_uri='http://localhost:8080/callback'
 scope='playlist-read-private,streaming,user-read-private,playlist-read-collaborative,playlist-modify-private'
 
@@ -137,14 +137,16 @@ def detect_emotion():
         return jsonify({'error': str(e)}), 500
     
     
-@app.route('/spotify-login')
+@app.route('/spotify-login', methods=['GET'])
 def spotify_login():
     emotion_id = request.args.get('emotion', type=int)
     if emotion_id not in music_dist:
         return jsonify({"error": "Invalid emotion ID"}), 400
-        
+    
+    # Only generate auth URL when requested by the button click
     auth_url = sp_oauth.get_authorize_url(state=str(emotion_id))
-    return jsonify({'auth_url': auth_url})
+    return jsonify({'auth_url': auth_url})  # Send URL to frontend
+
     
 @app.route("/callback")
 def callback():
