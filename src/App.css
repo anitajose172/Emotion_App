@@ -41,7 +41,8 @@
 body {
   margin: 0;
   font-family: 'Poppins', sans-serif;
-  background: linear-gradient(135deg, #577ec7 0%, #2a5298 100%);
+  /* background-image: url("E:\SpotifyUI\emotion_app\src\img\music.webp"); */
+  background-color: #434051;
   color: #fff;
   display: flex;
   justify-content: center;
@@ -134,4 +135,79 @@ body {
 
 .spotify-btn:hover {
   background: linear-gradient(90deg, #1ed760, #1db954);
+}
+
+.auth-container {
+  max-width: 400px;
+  margin: 5rem auto;
+  padding: 2.5rem; /* Increased padding for better spacing */
+  background: rgba(255, 255, 255, 0.98); /* Slightly more opaque background */
+  border-radius: 12px; /* Smoother rounded corners */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15); /* Deeper shadow for better depth */
+  text-align: center;
+  border: 1px solid rgba(0, 0, 0, 0.1); /* Subtle border for better definition */
+}
+
+.auth-container h2 {
+  margin-bottom: 1.5rem;
+  color: #333;
+  font-size: 1.75rem; /* Slightly larger heading */
+  font-weight: 600; /* Bold heading */
+}
+
+.auth-container input {
+  width: 100%;
+  padding: 0.875rem; /* Slightly larger padding for inputs */
+  margin: 0.75rem 0; /* Equal margin on top and bottom */
+  border: 1px solid #ddd; /* Softer border color */
+  border-radius: 8px; /* Smoother rounded corners */
+  font-size: 1rem;
+  transition: border-color 0.3s ease; /* Smooth transition for focus */
+}
+
+.auth-container input:focus {
+  border-color: #61dafb; /* Highlight input on focus */
+  outline: none; /* Remove default outline */
+  box-shadow: 0 0 0 3px rgba(97, 218, 251, 0.2); /* Subtle focus shadow */
+}
+
+.auth-container button {
+  width: 100%;
+  padding: 0.875rem; /* Slightly larger padding for button */
+  background-color: #61dafb;
+  border: none;
+  border-radius: 8px; /* Smoother rounded corners */
+  font-size: 1rem;
+  font-weight: 600; /* Bold button text */
+  cursor: pointer;
+  margin-top: 1.5rem; /* Increased margin for better spacing */
+  transition: background-color 0.3s ease; /* Smooth hover transition */
+}
+
+.auth-container button:hover {
+  background-color: #4fa3c7; /* Darker hover color */
+}
+
+.auth-container p {
+  margin-top: 1.5rem; /* Increased margin for better spacing */
+  color: #555;
+  font-size: 0.95rem; /* Slightly smaller text */
+}
+
+.auth-container a {
+  color: #61dafb;
+  text-decoration: none;
+  font-weight: 500; /* Slightly bold link */
+  transition: color 0.3s ease; /* Smooth hover transition */
+}
+
+.auth-container a:hover {
+  color: #4fa3c7; /* Darker hover color */
+}
+
+.error-message {
+  color: #ff4d4d;
+  margin-bottom: 1rem;
+  font-size: 0.9rem; /* Slightly smaller error text */
+  font-weight: 500; /* Bold error text */
 }
