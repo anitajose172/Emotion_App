@@ -138,7 +138,7 @@ body {
 }
 
 .auth-container {
-  max-width: 400px;
+  max-width: 500px;
   margin: 5rem auto;
   padding: 2.5rem; /* Increased padding for better spacing */
   background: rgba(255, 255, 255, 0.98); /* Slightly more opaque background */
@@ -156,7 +156,7 @@ body {
 }
 
 .auth-container input {
-  width: 100%;
+  width: 90%;
   padding: 0.875rem; /* Slightly larger padding for inputs */
   margin: 0.75rem 0; /* Equal margin on top and bottom */
   border: 1px solid #ddd; /* Softer border color */

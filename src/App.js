@@ -4,25 +4,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-d
 import Signup from "./Signup";
 import Login from "./Login";
 import Camera from "./Camera";
-import EmotionDisplay from './EmotionDisplay';
 import axios from "axios";
 
 function App() {
-  const [emotion, setEmotion] = useState(null);
 
-  const authenticateSpotify = async (emotionId) => {
-    try {
-      const response = await axios.get('http://localhost:8080/spotify-login', {
-        params: { emotion: emotionId },
-      });
-      
-      if (response.data.auth_url) {
-        window.location.href = response.data.auth_url; // Redirect to Spotify auth
-      }
-    } catch (error) {
-      console.error('Spotify auth error:', error);
-    }
-  };
+
 
   const fetchUserProfile = async () => {
     try {
@@ -34,21 +20,8 @@ function App() {
   };
   
 
-  const handleEmotionDetected = async (data) => {
-    if (!data?.emotions?.length) return;
 
-    const primaryEmotionIndex = data.emotion_indices[0];
 
-    // Save the detected emotion for display
-    setEmotion(data.emotions[0]);
-
-    try {
-      // Redirect to Spotify for authorization
-      authenticateSpotify(primaryEmotionIndex);
-    } catch (error) {
-      console.error('Error during Spotify flow:', error);
-    }
-  };
 
   useEffect(() => {
     const handleSpotifyCallback = async () => {
@@ -97,13 +70,12 @@ function App() {
           {/* Camera page */}
           <Route
             path="/camera"
-            element={<Camera onEmotionDetected={handleEmotionDetected} />}
+            element={<Camera />}
           />
         </Routes>
       </Router>
 
-      {/* Emotion Display (global) */}
-      <EmotionDisplay emotion={emotion} />
+   
     </div>
   );
 }

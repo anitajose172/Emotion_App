@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect } from "react";
 import Webcam from "react-webcam";
 import axios from "axios";
+import EmotionDisplay from "./EmotionDisplay";
 
-const Camera = ({ onEmotionDetected }) => {
+const Camera = () => {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
   const [captureError, setCaptureError] = useState(null);
+  const [primary_emotion, setPrimaryEmotion] = useState(null);
   const [emotions, setEmotions] = useState([]);
   const [isWebcamReady, setIsWebcamReady] = useState(false);
   const [lastDetectedEmotionId, setLastDetectedEmotionId] = useState(null);
@@ -56,13 +58,13 @@ const Camera = ({ onEmotionDetected }) => {
         setEmotions(emotions);
         drawBoundingBoxes(face_coordinates, emotions);
         setLastDetectedEmotionId(emotion_indices[0]); // Save the first detected emotion's ID
-        onEmotionDetected(response.data);
+        handleEmotionDetected(response.data);
       } else {
         setCaptureError("No emotions detected.");
       }
     } catch (error) {
       setCaptureError("Error capturing image or processing with API.");
-      console.error("Emotion detection error:", error);
+      // console.error("Emotion detection error:", error);
     }
   };
 
@@ -74,9 +76,9 @@ const Camera = ({ onEmotionDetected }) => {
   
     try {
       // Set a 10-second delay before redirecting
-      setCaptureError("Redirecting in 10 seconds...");
+      // setCaptureError("Redirecting in 10 seconds...");
   
-      setTimeout(async () => {
+      // setTimeout(async () => {
         try {
           const response = await axios.get("http://localhost:8080/spotify-login", {
             params: { emotion: lastDetectedEmotionId },
@@ -88,12 +90,60 @@ const Camera = ({ onEmotionDetected }) => {
         } catch (error) {
           console.error("Spotify auth error:", error);
         }
-      }, 10000); // 10 seconds delay (10,000 milliseconds)
+      // }, 0); // 10 seconds delay (10,000 milliseconds)
   
     } catch (error) {
       console.error("Error in redirect:", error);
     }
   };
+
+    const authenticateSpotify = async (emotionId) => {
+      try {
+        const response = await axios.get('http://localhost:8080/spotify-login', {
+          params: { emotion: emotionId },
+        });
+        
+        if (response.data.auth_url) {
+          // window.location.href = response.data.auth_url; // Redirect to Spotify auth
+        }
+      } catch (error) {
+        console.error('Spotify auth error:', error);
+      }
+    };
+
+    /**
+   * Act on emotion detection
+   * 
+   * NOTE: Since you are getting a array of emotions, create a new array of these arrays.
+   * Basically a 2 dimensional array, 
+   * e.g. emotion_matrix = [
+   *    [...emotions_at_first_attempt],
+   *    [...emotions_at_second_attempt],
+   *    [...emotions_at_third_attempt],
+   *    [...emotions_at_fourth_attempt],
+   *    ...
+   * ]
+   * 
+   * Now from this matrix derive the most prominent/primary emotion (could be based on frequency or come up with a better calculation)
+   * @param {string[]} data 
+   * @returns 
+   */
+    const handleEmotionDetected = async (data) => {
+      if (!data?.emotions?.length) return;
+  
+      const primaryEmotionIndex = data.emotion_indices[0];
+  
+      // Save the detected emotion for display
+      setPrimaryEmotion(data.emotions[0]);
+  
+      try {
+        // Redirect to Spotify for authorization
+        authenticateSpotify(primaryEmotionIndex);
+      } catch (error) {
+        console.error('Error during Spotify flow:', error);
+      }
+    };
+  
   
 
   useEffect(() => {
@@ -106,7 +156,8 @@ const Camera = ({ onEmotionDetected }) => {
   }, [isWebcamReady]);
 
   return (
-    <div className="camera-container">
+    <React.Fragment>
+          <div className="camera-container">
       <div style={{ position: "relative" }}>
         <Webcam
           audio={false}
@@ -125,17 +176,12 @@ const Camera = ({ onEmotionDetected }) => {
         <button onClick={redirectToSpotify}>Redirect to Spotify</button>
       </div>
       {captureError && <p className="error-message">{captureError}</p>}
-      {emotions.length > 0 && (
-        <div className="emotions-list">
-          <h3>Real-Time Detected Emotions:</h3>
-          <ul>
-            {emotions.map((emotion, index) => (
-              <li key={index}>Emotion {index + 1}: {emotion}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      
     </div>
+         {/* Emotion Display (global) */}
+        <EmotionDisplay emotion={primary_emotion} />
+    </React.Fragment>
+
   );
 };
 
