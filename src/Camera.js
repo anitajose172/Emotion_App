@@ -12,6 +12,11 @@ const Camera = () => {
   const [emotions, setEmotions] = useState([]);
   const [isWebcamReady, setIsWebcamReady] = useState(false);
   const [lastDetectedEmotionId, setLastDetectedEmotionId] = useState(null);
+  const [capturedImages, setCapturedImages] = useState([]);
+  const [fetchedImage, setFetchedImage] = useState(null);
+  const [imageList, setImageList] = useState([]);
+  const [capturedFilenames, setCapturedFilenames] = useState([]);
+
 
   const drawBoundingBoxes = (faces, emotions) => {
     const canvas = canvasRef.current;
@@ -33,40 +38,54 @@ const Camera = () => {
       const emotionText = emotions[index] || "No emotion detected";
       ctx.fillStyle = "#FF0000";
       ctx.font = "16px Arial";
-      ctx.fillText(emotionText, x + 5, y - 10); // Place text slightly above the bounding box
+      ctx.fillText(emotionText, x + 5, y - 10); 
     });
   };
 
+  
   const detectEmotion = async () => {
     if (!isWebcamReady) return;
-
+  
     try {
       const imageSrc = videoRef.current?.getScreenshot();
-
+  
       if (!imageSrc) {
         setCaptureError("Unable to capture image.");
         return;
       }
-
+  
       const base64Image = imageSrc.split(",")[1];
       const response = await axios.post("http://127.0.0.1:8080/detect_emotion", {
         image: base64Image,
       });
-
+  
       if (response.data && response.data.emotions) {
         const { emotions, face_coordinates, emotion_indices } = response.data;
         setEmotions(emotions);
         drawBoundingBoxes(face_coordinates, emotions);
-        setLastDetectedEmotionId(emotion_indices[0]); // Save the first detected emotion's ID
+        setLastDetectedEmotionId(emotion_indices[0]);
+  
+        // Capture and store the image with face coordinates
+        const storeResponse = await axios.post("http://localhost:8080/store_image", {
+          image: base64Image,
+          emotion_id: emotion_indices[0],
+          face_coordinates: face_coordinates, // Add this line
+        });
+  
+        if (storeResponse.data.filename) {
+          setCapturedFilenames((prevFilenames) => [...prevFilenames, storeResponse.data.filename]);
+        }
+  
         handleEmotionDetected(response.data);
       } else {
         setCaptureError("No emotions detected.");
       }
     } catch (error) {
       setCaptureError("Error capturing image or processing with API.");
-      // console.error("Emotion detection error:", error);
+      console.error("Emotion detection error:", error);
     }
   };
+  
 
   const redirectToSpotify = async () => {
     if (!lastDetectedEmotionId) {
@@ -75,47 +94,44 @@ const Camera = () => {
     }
   
     try {
-      // Set a 10-second delay before redirecting
-      // setCaptureError("Redirecting in 10 seconds...");
+      const lastFilename = capturedFilenames[capturedFilenames.length - 1];
+      if (!lastFilename) {
+        setCaptureError("No image captured yet.");
+        return;
+      }
   
-      // setTimeout(async () => {
-        try {
-          const response = await axios.get("http://localhost:8080/spotify-login", {
-            params: { emotion: lastDetectedEmotionId },
-          });
+      const response = await axios.get("http://localhost:8080/spotify-login", {
+        params: { emotion: lastDetectedEmotionId },
+      });
   
-          if (response.data.auth_url) {
-            window.location.href = response.data.auth_url; // Redirect to Spotify
-          }
-        } catch (error) {
-          console.error("Spotify auth error:", error);
-        }
-      // }, 0); // 10 seconds delay (10,000 milliseconds)
-  
+      if (response.data.auth_url) {
+        window.location.href = response.data.auth_url; // Redirect to Spotify
+      }
     } catch (error) {
       console.error("Error in redirect:", error);
     }
   };
 
-    const authenticateSpotify = async (emotionId) => {
-      try {
-        const response = await axios.get('http://localhost:8080/spotify-login', {
-          params: { emotion: emotionId },
-        });
-        
-        if (response.data.auth_url) {
-          // window.location.href = response.data.auth_url; // Redirect to Spotify auth
-        }
-      } catch (error) {
-        console.error('Spotify auth error:', error);
-      }
-    };
 
-    /**
+  const authenticateSpotify = async (emotionId) => {
+    try {
+      const response = await axios.get("http://localhost:8080/spotify-login", {
+        params: { emotion: emotionId },
+      });
+
+      if (response.data.auth_url) {
+        // window.location.href = response.data.auth_url; // Redirect to Spotify auth
+      }
+    } catch (error) {
+      console.error("Spotify auth error:", error);
+    }
+  };
+
+  /**
    * Act on emotion detection
-   * 
+   *
    * NOTE: Since you are getting a array of emotions, create a new array of these arrays.
-   * Basically a 2 dimensional array, 
+   * Basically a 2 dimensional array,
    * e.g. emotion_matrix = [
    *    [...emotions_at_first_attempt],
    *    [...emotions_at_second_attempt],
@@ -123,28 +139,111 @@ const Camera = () => {
    *    [...emotions_at_fourth_attempt],
    *    ...
    * ]
-   * 
+   *
    * Now from this matrix derive the most prominent/primary emotion (could be based on frequency or come up with a better calculation)
-   * @param {string[]} data 
-   * @returns 
+   * @param {string[]} data
+   * @returns
    */
-    const handleEmotionDetected = async (data) => {
-      if (!data?.emotions?.length) return;
-  
-      const primaryEmotionIndex = data.emotion_indices[0];
-  
-      // Save the detected emotion for display
-      setPrimaryEmotion(data.emotions[0]);
-  
-      try {
-        // Redirect to Spotify for authorization
-        authenticateSpotify(primaryEmotionIndex);
-      } catch (error) {
-        console.error('Error during Spotify flow:', error);
-      }
+  const handleEmotionDetected = async (data) => {
+    if (!data?.emotions?.length) return;
+
+    const primaryEmotionIndex = data.emotion_indices[0];
+
+    // Save the detected emotion for display
+    setPrimaryEmotion(data.emotions[0]);
+
+    try {
+      // Redirect to Spotify for authorization
+      authenticateSpotify(primaryEmotionIndex);
+    } catch (error) {
+      console.error("Error during Spotify flow:", error);
+    }
+  };
+
+  const fetchImage = async (filename) => {
+  try {
+    // Fetch the image
+    const imageResponse = await axios.get("http://localhost:8080/get_image", {
+      params: { filename },
+      responseType: 'blob',
+    });
+
+    // Fetch the metadata
+    const metadata = await fetchMetadata(filename);
+    if (!metadata) {
+      console.error("No metadata found for the image.");
+      return;
+    }
+
+    // Convert the blob to a URL and set it in state
+    const imageUrl = URL.createObjectURL(imageResponse.data);
+    const imageElement = new Image();
+    imageElement.src = imageUrl;
+
+    // Wait for the image to load
+    imageElement.onload = () => {
+      // Draw the bounding box and emotion text
+      drawBoundingBox(imageElement, metadata.face_coordinates[0], metadata.emotion);
+
+      // Set the modified image in state
+      setFetchedImage(imageElement.src);
     };
+  } catch (error) {
+    console.error("Error fetching image:", error);
+    setFetchedImage(null); // Clear the image in case of error
+  }
+};
+
+const fetchMetadata = async (filename) => {
+  try {
+    const response = await axios.get("http://localhost:8080/get_metadata", {
+      params: { filename },
+    });
+
+    console.log("Metadata fetched successfully:", response.data);
+    return response.data;
+  } catch (error) {
+    console.error("Error fetching metadata:", error);
+    return null;
+  }
+};
+
+  const drawBoundingBox = (imageElement, faceCoordinates, emotion) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = imageElement.width;
+    canvas.height = imageElement.height;
+    const ctx = canvas.getContext('2d');
   
+    // Draw the image on the canvas
+    ctx.drawImage(imageElement, 0, 0);
   
+    // Draw the bounding box
+    ctx.strokeStyle = '#FF0000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(faceCoordinates.x, faceCoordinates.y, faceCoordinates.w, faceCoordinates.h);
+  
+    // Draw the emotion text
+    ctx.fillStyle = '#FF0000';
+    ctx.font = '16px Arial';
+    ctx.fillText(emotion, faceCoordinates.x + 5, faceCoordinates.y - 10);
+  
+    // Replace the image source with the canvas
+    imageElement.src = canvas.toDataURL();
+  };
+
+  const listImages = async () => {
+    try {
+      const response = await axios.get("http://localhost:8080/list_images");
+      setImageList(response.data.images);
+    } catch (error) {
+      console.error("Error listing images:", error);
+    }
+  };
+
+  // Call this function when the component mounts
+  useEffect(() => {
+    listImages();
+  }, []);
 
   useEffect(() => {
     // Continuously detect emotions every 1 second
@@ -157,31 +256,35 @@ const Camera = () => {
 
   return (
     <React.Fragment>
-          <div className="camera-container">
-      <div style={{ position: "relative" }}>
-        <Webcam
-          audio={false}
-          height={480}
-          ref={videoRef}
-          screenshotFormat="image/jpeg"
-          className="webcam-view"
-          onUserMedia={() => setIsWebcamReady(true)}
-        />
-        <canvas
-          ref={canvasRef}
-          style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
-        />
+      <div className="camera-container">
+        <div style={{ position: "relative" }}>
+          <Webcam
+            audio={false}
+            height={480}
+            ref={videoRef}
+            screenshotFormat="image/jpeg"
+            className="webcam-view"
+            onUserMedia={() => setIsWebcamReady(true)}
+          />
+          <canvas
+            ref={canvasRef}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              pointerEvents: "none",
+            }}
+          />
+        </div>
+        <div className="controls">
+          <button onClick={redirectToSpotify}>Redirect to Spotify</button>
+        </div>
+        {captureError && <p className="error-message">{captureError}</p>}
       </div>
-      <div className="controls">
-        <button onClick={redirectToSpotify}>Redirect to Spotify</button>
-      </div>
-      {captureError && <p className="error-message">{captureError}</p>}
       
-    </div>
-         {/* Emotion Display (global) */}
-        <EmotionDisplay emotion={primary_emotion} />
+      {/* Emotion Display (global) */}
+      <EmotionDisplay emotion={primary_emotion} />
     </React.Fragment>
-
   );
 };
 

@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, session, redirect, url_for
+from flask import Flask, request, jsonify, session, redirect, url_for, Response
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from tensorflow.keras.models import load_model
@@ -12,6 +12,9 @@ from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth
 from spotipy.cache_handler import FlaskSessionCacheHandler
 import os
+from datetime import datetime
+from cryptography.fernet import Fernet
+import json
 
 app = Flask(__name__)
 
@@ -28,6 +31,20 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+
+# Generate a key for encryption (store this securely)
+key = Fernet.generate_key()
+cipher_suite = Fernet(key)
+
+class CapturedImage(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    emotion_id = db.Column(db.Integer, nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    image_filename = db.Column(db.String(120), nullable=False)
+
+    def __repr__(self):
+        return f'<CapturedImage {self.image_filename}>'
 
 
 # Load Haar Cascade
@@ -85,12 +102,77 @@ music_dist = {
 
 
 
+# @app.route('/detect_emotion', methods=['POST'])
+# def detect_emotion():
+#     try:
+#         # Get frame data (Base64 encoded image)
+#         data = request.json
+#         image_data = base64.b64decode(data['image'])
+#         frame = np.frombuffer(image_data, dtype=np.uint8)
+#         frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+
+#         if frame is None:
+#             logging.error("Failed to decode image.")
+#             return jsonify({'error': 'Failed to decode image.'}), 400
+
+#         # Convert to grayscale for Haar Cascade
+#         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+#         faces = face_classifier.detectMultiScale(gray_frame, scaleFactor=1.3, minNeighbors=5)
+
+#         emotions = []
+#         emotion_indices = [] 
+#         face_coordinates = [] 
+#         for (x, y, w, h) in faces:
+#             # Extract the face ROI
+#             roi_gray = gray_frame[y:y+h, x:x+w]
+#             roi_gray = cv2.resize(roi_gray, (48, 48))
+#             roi_gray = roi_gray.astype('float') / 255.0
+#             roi_gray = np.expand_dims(roi_gray, axis=0)
+#             roi_gray = np.expand_dims(roi_gray, axis=-1)
+            
+#             face_coordinates.append({
+#                 'x': int(x),
+#                 'y': int(y),
+#                 'w': int(w),
+#                 'h': int(h)
+#             })
+
+#             # Predict emotion
+#             prediction = model.predict(roi_gray)
+#             emotion_index = int(np.argmax(prediction)) 
+#             emotion_indices.append(emotion_index) 
+#             emotions.append(emotion_map[emotion_index]) 
+#         if not emotions:
+#             logging.warning("No faces detected.")
+#             return jsonify({'emotions': [], 'warning': 'No faces detected.'})
+
+#         return jsonify({
+#         'emotions': emotions,
+#         'emotion_indices': emotion_indices,  
+#         'face_coordinates': face_coordinates,
+#         'recommendations': [
+#     music_dist[index]  # Return Spotify URI directly
+#     for index in emotion_indices
+# ]
+        
+#     })
+    
+#     except Exception as e:
+#         logging.error(f"Error in detect_emotion: {str(e)}")
+#         return jsonify({'error': str(e)}), 500
+    
+    
 @app.route('/detect_emotion', methods=['POST'])
 def detect_emotion():
     try:
         # Get frame data (Base64 encoded image)
         data = request.json
-        image_data = base64.b64decode(data['image'])
+        try:
+            image_data = base64.b64decode(data['image'])
+        except (base64.binascii.Error, KeyError):
+            logging.error("Invalid base64 image data.")
+            return jsonify({'error': 'Invalid image data.'}), 400
+
         frame = np.frombuffer(image_data, dtype=np.uint8)
         frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
 
@@ -103,8 +185,8 @@ def detect_emotion():
         faces = face_classifier.detectMultiScale(gray_frame, scaleFactor=1.3, minNeighbors=5)
 
         emotions = []
-        emotion_indices = [] 
-        face_coordinates = [] 
+        emotion_indices = []
+        face_coordinates = []
         for (x, y, w, h) in faces:
             # Extract the face ROI
             roi_gray = gray_frame[y:y+h, x:x+w]
@@ -112,7 +194,7 @@ def detect_emotion():
             roi_gray = roi_gray.astype('float') / 255.0
             roi_gray = np.expand_dims(roi_gray, axis=0)
             roi_gray = np.expand_dims(roi_gray, axis=-1)
-            
+
             face_coordinates.append({
                 'x': int(x),
                 'y': int(y),
@@ -122,28 +204,27 @@ def detect_emotion():
 
             # Predict emotion
             prediction = model.predict(roi_gray)
-            emotion_index = int(np.argmax(prediction)) 
-            emotion_indices.append(emotion_index) 
-            emotions.append(emotion_map[emotion_index]) 
+            emotion_index = int(np.argmax(prediction))
+            emotion_indices.append(emotion_index)
+            emotions.append(emotion_map[emotion_index])
+
         if not emotions:
             logging.warning("No faces detected.")
             return jsonify({'emotions': [], 'warning': 'No faces detected.'})
 
         return jsonify({
-        'emotions': emotions,
-        'emotion_indices': emotion_indices,  
-        'face_coordinates': face_coordinates,
-        'recommendations': [
-    music_dist[index]  # Return Spotify URI directly
-    for index in emotion_indices
-]
-        
-    })
-    
+            'emotions': emotions,
+            'emotion_indices': emotion_indices,
+            'face_coordinates': face_coordinates,
+            'recommendations': [
+                music_dist[index]  # Return Spotify URI directly
+                for index in emotion_indices
+            ]
+        })
+
     except Exception as e:
         logging.error(f"Error in detect_emotion: {str(e)}")
         return jsonify({'error': str(e)}), 500
-    
     
 @app.route('/spotify-login', methods=['GET'])
 def spotify_login():
@@ -291,6 +372,121 @@ def login():
         return jsonify({"error": "Invalid username or password"}), 401
 
     return jsonify({"message": "Login successful"}), 200
+
+
+@app.route('/get_metadata', methods=['GET'])
+def get_metadata():
+    try:
+        image_filename = request.args.get('filename')
+        if not image_filename:
+            return jsonify({"error": "Filename is required"}), 400
+
+        # Construct the full path to the metadata file
+        metadata_filename = f'captured_images/{image_filename}.json'
+
+        # Check if the file exists
+        if not os.path.exists(metadata_filename):
+            return jsonify({"error": "Metadata file not found"}), 404
+
+        # Read the metadata file
+        with open(metadata_filename, 'r') as f:
+            metadata = json.load(f)
+
+        return jsonify(metadata), 200
+
+    except FileNotFoundError:
+        logging.error(f"Metadata file not found: {metadata_filename}")
+        return jsonify({"error": "Metadata not found"}), 404
+    except Exception as e:
+        logging.error(f"Error retrieving metadata: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/store_image', methods=['POST'])
+def store_image():
+    try:
+        data = request.json
+
+        # Check for required keys in the payload
+        required_keys = ['image', 'emotion_id', 'face_coordinates']
+        for key in required_keys:
+            if key not in data:
+                return jsonify({"error": f"Missing key in request payload: {key}"}), 400
+
+        image_data = data['image']
+        emotion_id = data['emotion_id']
+        face_coordinates = data['face_coordinates']
+
+        # Decode the base64 image data
+        image_bytes = base64.b64decode(image_data)
+
+        # Encrypt the image data
+        encrypted_image = cipher_suite.encrypt(image_bytes)
+
+        # Create a directory to store images if it doesn't exist
+        if not os.path.exists('captured_images'):
+            os.makedirs('captured_images')
+
+        # Save the encrypted image with a timestamp and emotion ID
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        image_filename = f'{timestamp}_emotion_{emotion_id}.enc'
+        with open(f'captured_images/{image_filename}', 'wb') as f:
+            f.write(encrypted_image)
+
+        # Save metadata (bounding box and emotion)
+        metadata = {
+            "filename": image_filename,
+            "emotion": emotion_map[emotion_id],
+            "face_coordinates": face_coordinates,
+        }
+        metadata_filename = f'captured_images/{image_filename}.json'
+        with open(metadata_filename, 'w') as f:
+            json.dump(metadata, f)
+
+        # Return the filename to the frontend
+        return jsonify({
+            "message": "Image stored successfully",
+            "filename": image_filename
+        }), 200
+
+    except Exception as e:
+        logging.error(f"Error storing image: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    
+    
+@app.route('/get_image', methods=['GET'])
+def get_image():
+    try:
+        image_filename = request.args.get('filename')
+        if not image_filename:
+            return jsonify({"error": "Filename is required"}), 400
+
+        # Read the encrypted image file
+        with open(f'captured_images/{image_filename}', 'rb') as f:
+            encrypted_image = f.read()
+
+        # Decrypt the image data
+        decrypted_image = cipher_suite.decrypt(encrypted_image)
+
+        # Return the decrypted image as a response
+        return Response(decrypted_image, mimetype='image/jpeg')
+
+    except FileNotFoundError:
+        logging.error(f"Image file not found: {image_filename}")
+        return jsonify({"error": "Image not found"}), 404
+    except Exception as e:
+        logging.error(f"Error retrieving image: {str(e)}")
+        return jsonify({"error": str(e)}), 500
+    
+@app.route('/list_images', methods=['GET'])
+def list_images():
+    try:
+        # List all files in the captured_images directory
+        image_files = os.listdir('captured_images')
+        return jsonify({"images": image_files}), 200
+    except Exception as e:
+        logging.error(f"Error listing images: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=8080)
