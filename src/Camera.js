@@ -13,6 +13,7 @@ const Camera = () => {
   const [lastDetectedEmotionId, setLastDetectedEmotionId] = useState(null);
   const [faceCoordinates, setFaceCoordinates] = useState([]);
 
+  // #### Draw Bounding Boxes
   const drawBoundingBoxes = (faces, emotions) => {
     const canvas = canvasRef.current;
     const video = videoRef.current?.video;
@@ -37,6 +38,7 @@ const Camera = () => {
     });
   };
 
+  // #### Detect Emotions in Real-Time
   const detectEmotion = async () => {
     if (!isWebcamReady) return;
 
@@ -56,9 +58,9 @@ const Camera = () => {
         const { emotions, face_coordinates, emotion_indices } = response.data;
         setEmotions(emotions);
         setFaceCoordinates(face_coordinates);
-        drawBoundingBoxes(face_coordinates, emotions);
         setLastDetectedEmotionId(emotion_indices[0]);
         setPrimaryEmotion(emotions[0]);
+        drawBoundingBoxes(face_coordinates, emotions);
       } else {
         setCaptureError("No emotions detected.");
       }
@@ -68,6 +70,15 @@ const Camera = () => {
     }
   };
 
+  // #### Set Up Continuous Detection
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isWebcamReady) detectEmotion();
+    }, 1000); // Detect every second
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, [isWebcamReady]);
+
+  // #### Capture and Redirect on Button Click
   const redirectToSpotify = async () => {
     if (!lastDetectedEmotionId) {
       setCaptureError("No emotion detected to redirect.");
@@ -103,13 +114,6 @@ const Camera = () => {
       setCaptureError("Error storing image or redirecting to Spotify.");
     }
   };
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (isWebcamReady) detectEmotion();
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [isWebcamReady]);
 
   return (
     <React.Fragment>

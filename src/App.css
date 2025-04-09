@@ -42,7 +42,7 @@ body {
   margin: 0;
   font-family: 'Poppins', sans-serif;
   /* background-image: url("E:\SpotifyUI\emotion_app\src\img\music.webp"); */
-  background-color: #434051;
+  background-color: #ffffff;
   color: #fff;
   display: flex;
   justify-content: center;
@@ -56,7 +56,7 @@ body {
 .title {
   font-size: 2.5rem;
   font-weight: bold;
-  background: -webkit-linear-gradient(45deg, #ffffff, #d9e8ff);
+  background: -webkit-linear-gradient(45deg, #000000, #000000);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   margin-bottom: 20px;
@@ -69,7 +69,7 @@ body {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 100vh; /* Ensure it takes the full viewport height */
+  height: 100vh; 
   padding: 20px;
 }
 
