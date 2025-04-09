@@ -23,7 +23,7 @@ const Camera = () => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     faces.forEach((face, index) => {
       const { x, y, w, h } = face;
@@ -114,6 +114,8 @@ const Camera = () => {
       setCaptureError("Error storing image or redirecting to Spotify.");
     }
   };
+
+
 
   return (
     <React.Fragment>
